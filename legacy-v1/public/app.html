@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5"
+    />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta
+      name="description"
+      content="Рядом — приложение для жителей Севастополя: чаты домов и СНТ, заявки, карта города, проверенные специалисты."
+    />
+    <title>Рядом — Севастополь</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Рядом" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- боковое меню (десктоп) -->
+      <aside class="rail" id="rail"></aside>
+
+      <div class="main">
+        <header class="topbar" id="topbar">
+          <div class="brand-mini">
+            <div class="logo-mark">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#fff"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" />
+                <circle cx="12" cy="10" r="2.4" />
+              </svg>
+            </div>
+            <div>
+              <div class="brand-name">Рядом</div>
+              <div class="brand-city" id="cityLabel">Севастополь</div>
+            </div>
+          </div>
+          <div class="top-actions">
+            <button class="icon-btn" id="notifBtn" aria-label="Уведомления">
+              <svg viewBox="0 0 24 24">
+                <path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
+                <path d="M13.7 20a2 2 0 0 1-3.4 0" />
+              </svg>
+              <span class="dot hidden" id="notifDot"></span>
+            </button>
+            <button class="avatar-btn" id="avatarBtn" aria-label="Профиль">?</button>
+          </div>
+        </header>
+
+        <div class="screens" id="screens">
+          <!-- ГЛАВНАЯ -->
+          <section class="screen active" data-screen="home">
+            <div class="wrap">
+              <div class="hello">
+                <h1 id="helloTitle">Добрый день</h1>
+                <p>
+                  <span class="city-pill">📍 Севастополь</span
+                  ><span id="helloSub">Городские чаты, заявки и помощь рядом</span>
+                </p>
+              </div>
+
+              <div class="section" id="feedSection" style="margin-top: 16px">
+                <div class="section-head">
+                  <h2 class="section-title">В городе</h2>
+                  <button class="section-link" data-goto="map">На карте</button>
+                </div>
+                <div class="feed-scroll" id="feed"></div>
+              </div>
+
+              <div class="section">
+                <div class="section-head"><h2 class="section-title">Что случилось?</h2></div>
+                <div class="tiles" id="tiles"></div>
+              </div>
+
+              <div class="section">
+                <div class="section-head">
+                  <h2 class="section-title">Рядом с вами</h2>
+                  <button class="section-link" id="locLink">Моё местоположение</button>
+                </div>
+                <div class="list single" id="nearby"></div>
+              </div>
+
+              <div class="section">
+                <div class="section-head">
+                  <h2 class="section-title">Мои заявки</h2>
+                  <button class="section-link" id="allRequests">Все</button>
+                </div>
+                <div class="list single" id="myRequests"></div>
+              </div>
+
+              <div class="section">
+                <div
+                  class="card pad"
+                  style="
+                    display: flex;
+                    gap: 12px;
+                    align-items: center;
+                    background: linear-gradient(135deg, #eef2ff, #e4edff);
+                    border-color: #dde2ff;
+                  "
+                >
+                  <div style="font-size: 26px">🤝</div>
+                  <div style="flex: 1">
+                    <div style="font-weight: 750; font-size: 13.5px">Помогите соседям</div>
+                    <div class="hint" style="margin-top: 2px">
+                      Загляните в чат своего дома — там просьбы и объявления
+                    </div>
+                  </div>
+                  <button class="btn sm" data-goto="chats" style="width: auto">Открыть</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- КАРТА -->
+          <section class="screen map-screen" data-screen="map">
+            <div id="map"></div>
+            <div class="map-overlay">
+              <div class="map-search">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M20 20l-3.2-3.2" />
+                </svg>
+                <input
+                  id="mapSearch"
+                  type="search"
+                  placeholder="Улица, дом, СНТ — поиск по Севастополю"
+                  autocomplete="off"
+                />
+                <button class="clear hidden" id="mapSearchClear">✕</button>
+              </div>
+              <div class="map-search-results hidden" id="mapSearchResults"></div>
+              <div class="map-filters">
+                <div class="chips" id="mapFilters"></div>
+              </div>
+            </div>
+            <div class="map-bottom">
+              <div class="map-legend" id="mapLegend">
+                🏢 дома · 🌳 СНТ · 📌 заявки · 🔧 мастера · 👮 участковые
+              </div>
+              <button class="map-fab" id="locateBtn" aria-label="Моё местоположение">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="3.2" />
+                  <circle cx="12" cy="12" r="8" />
+                  <path d="M12 2v2M12 20v2M2 12h2M20 12h2" />
+                </svg>
+              </button>
+            </div>
+          </section>
+
+          <!-- ЧАТЫ -->
+          <section class="screen" data-screen="chats">
+            <div class="wrap">
+              <div class="hello">
+                <h1>Чаты</h1>
+                <p><span id="chatsHint">Дома и СНТ Севастополя</span></p>
+              </div>
+              <div class="segmented" id="chatTabs">
+                <button data-tab="house" class="active">🏢 Дома</button>
+                <button data-tab="snt">🌳 СНТ</button>
+              </div>
+              <div class="list single" id="chats" style="margin-top: 10px"></div>
+            </div>
+          </section>
+
+          <!-- СПЕЦИАЛИСТЫ -->
+          <section class="screen" data-screen="specialists">
+            <div class="wrap">
+              <div class="hello">
+                <h1>Специалисты</h1>
+                <p>Проверенные мастера и службы Севастополя</p>
+              </div>
+              <div class="chips" id="specFilters" style="margin-top: 12px"></div>
+              <div class="list single" id="specialists" style="margin-top: 12px"></div>
+              <div class="section">
+                <button class="btn secondary" id="addSpecialistBtn">＋ Добавить свой профиль мастера</button>
+              </div>
+              <div class="section">
+                <h2 class="section-title" style="margin-bottom: 10px">Экстренные службы</h2>
+                <div class="list" id="emergency"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ПРОФИЛЬ -->
+          <section class="screen" data-screen="profile">
+            <div class="wrap">
+              <div id="profileHero"></div>
+
+              <div class="section">
+                <h2 class="section-title" style="margin-bottom: 10px">Мой дом</h2>
+                <div class="list single" id="myChatCard"></div>
+              </div>
+
+              <div class="section">
+                <h2 class="section-title" style="margin-bottom: 10px">Аккаунт</h2>
+                <div class="settings" id="accountSettings"></div>
+              </div>
+
+              <div class="section">
+                <h2 class="section-title" style="margin-bottom: 10px">Настройки</h2>
+                <div class="settings" id="appSettings"></div>
+              </div>
+
+              <div class="section center hint" style="line-height: 1.6">
+                Рядом · Севастополь · версия 1.0<br />
+                Регистрация работает без Госуслуг — привязка появится позже.<br />
+                Лента города и часть справочников — демонстрационные данные.
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <nav class="tabbar"><div class="tabbar-inner" id="tabbar"></div></nav>
+      </div>
+    </div>
+
+    <!-- ЧАТ -->
+    <div class="dialog" id="dialog">
+      <div class="dialog-inner">
+        <div class="dlg-head">
+          <button class="dlg-back" id="dlgBack" aria-label="Назад" title="Назад (Esc)">
+            <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg>
+          </button>
+          <div style="flex: 1; min-width: 0">
+            <div class="dlg-title" id="dlgTitle">Чат</div>
+            <div class="dlg-sub" id="dlgSub">Участники</div>
+          </div>
+          <button
+            class="icon-btn"
+            id="dlgInfo"
+            aria-label="О чате"
+            style="width: 36px; height: 36px; border-radius: 11px"
+          >
+            <svg viewBox="0 0 24 24" style="width: 17px; height: 17px">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 11v5M12 8h.01" />
+            </svg>
+          </button>
+        </div>
+        <div class="dlg-body" id="dlgBody"></div>
+        <div class="dlg-join hidden" id="dlgJoinWrap">
+          <button class="btn" id="dlgJoinBtn">Вступить в чат</button>
+        </div>
+        <div class="dlg-input" id="dlgInputWrap">
+          <input id="dlgInput" placeholder="Написать соседям…" maxlength="1500" autocomplete="off" />
+          <button id="dlgSend" aria-label="Отправить">
+            <svg viewBox="0 0 24 24">
+              <path d="M22 2L11 13" />
+              <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО -->
+    <div class="sheet-back" id="sheetBack">
+      <div class="sheet" id="sheet" role="dialog" aria-modal="true">
+        <div class="sheet-head">
+          <div class="sheet-title" id="sheetTitle"></div>
+          <button class="sheet-close" id="sheetClose" aria-label="Закрыть">✕</button>
+        </div>
+        <div class="sheet-body" id="sheetBody"></div>
+        <div class="sheet-foot hidden" id="sheetFoot"></div>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="/assets/app.js"></script>
+  </body>
+</html>

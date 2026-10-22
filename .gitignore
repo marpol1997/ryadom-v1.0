@@ -1,0 +1,30 @@
+# зависимости
+node_modules/
+
+# next
+.next/
+out/
+next-env.d.ts
+
+# окружение и секреты
+.env
+.env.*
+!.env.example
+
+# служебное
+.vercel/
+coverage/
+*.log
+.DS_Store
+.idea/
+.vscode/
+*.tsbuildinfo
+
+# локальные данные
+data/
+
+# загруженные в dev фото
+public/uploads/
+
+# локальная база разработчика
+.pglite-data/
