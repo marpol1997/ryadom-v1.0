@@ -33,5 +33,10 @@ export default [
   {
     files: ['scripts/**/*.mjs', 'tests/**/*.{mjs,ts}'],
     languageOptions: { globals: globals.node }
+  },
+  {
+    // public/sw.js — service worker: self, caches и Cache API есть только там
+    files: ['public/**/*.js'],
+    languageOptions: { globals: globals.serviceworker }
   }
 ];

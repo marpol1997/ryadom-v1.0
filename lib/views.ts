@@ -450,17 +450,23 @@ interface BootstrapPayload {
 }
 
 /**
- * Весь bootstrap одним SQL-запросом.
+ * Весь bootstrap — тремя SQL-запросами, а не восемью (как было в 1.x) и не
+ * одним (как было до 2026-10-22).
  *
- * Почему не восемь запросов, как было: пулер Supabase (Supavisor) закрывает
- * соединение после ~7 запросов на сокете, и восьмой висит. Один запрос с
- * json_build_object даёт ту же выдачу за один round-trip и заодно быстрее
- * на serverless.
+ * Почему не один: полный bootstrap — это ~17 КБ JSON в одном ответе, а на
+ * части каналов до Postgres ответ крупнее ~12 КБ не доходит вовсе (клиент
+ * падает по read timeout). Замерено: `repeat('x', 12000)` доходит 8/8 раз,
+ * `repeat('x', 14000)` — 0/8, независимо от порта пулера и TLS.
+ *
+ * Почему не восемь: Supavisor закрывает сокет после ~7 запросов. Три запроса
+ * по 7 / 3 / 0,1 КБ — компромисс: каждый ответ заведомо ниже проблемного
+ * порога, а до лимита пулера остаётся запас.
  */
 export async function getBootstrap(user: UserRow | null): Promise<BootstrapData> {
   const userId = user?.id ?? null;
 
-  const rows = await query<{ payload: unknown }>(sql`
+  // 1. Дома и заявки — главный экран (~10 КБ).
+  const core = await query<{ payload: unknown }>(sql`
     select json_build_object(
       'buildings', coalesce((
         select json_agg(x order by x.title)
@@ -493,7 +499,13 @@ export async function getBootstrap(user: UserRow | null): Promise<BootstrapData>
           order by r.created_at desc
           limit 100
         ) y
-      ), '[]'::json),
+      ), '[]'::json)
+    ) as payload
+  `);
+
+  // 2. Справочники: категории, специалисты, участковые, лента, районы (~7 КБ).
+  const catalog = await query<{ payload: unknown }>(sql`
+    select json_build_object(
       'categories', coalesce((
         select json_agg(c order by c.sort_order, c.title) from request_categories c
       ), '[]'::json),
@@ -508,18 +520,28 @@ export async function getBootstrap(user: UserRow | null): Promise<BootstrapData>
       ), '[]'::json),
       'districts', coalesce((
         select json_agg(d.name order by d.sort_order, d.name) from districts d
-      ), '[]'::json),
-      'stats', json_build_object(
-        'requests', (select count(*)::int from service_requests where user_id = ${userId}::uuid),
-        'open', (select count(*)::int from service_requests
-                 where user_id = ${userId}::uuid and status in ('new', 'in_progress')),
-        'chats', (select count(*)::int from building_members where user_id = ${userId}::uuid),
-        'messages', (select count(*)::int from messages where user_id = ${userId}::uuid)
-      )
+      ), '[]'::json)
     ) as payload
   `);
 
-  const payload = (rows[0]?.payload ?? {}) as BootstrapPayload;
+  // 3. Личная статистика — только для вошедшего пользователя, ответ крошечный.
+  const statsRows = user
+    ? await query<{ stats: MeStats } & Record<string, unknown>>(sql`
+        select json_build_object(
+          'requests', (select count(*)::int from service_requests where user_id = ${user.id}::uuid),
+          'open', (select count(*)::int from service_requests
+                   where user_id = ${user.id}::uuid and status in ('new', 'in_progress')),
+          'chats', (select count(*)::int from building_members where user_id = ${user.id}::uuid),
+          'messages', (select count(*)::int from messages where user_id = ${user.id}::uuid)
+        ) as stats
+      `)
+    : [];
+
+  const payload: BootstrapPayload = {
+    ...((core[0]?.payload ?? {}) as BootstrapPayload),
+    ...((catalog[0]?.payload ?? {}) as BootstrapPayload),
+    stats: statsRows[0]?.stats
+  };
 
   return {
     city: CITY,
